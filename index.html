@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>転倒検証 - Fall Detection</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 100%;
+      padding: 8px;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      text-align: center;
+      padding: 8px;
+      background: #16213e;
+    }
+
+    h2 {
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      color: #3498db;
+    }
+
+    .video-container {
+      position: relative;
+      width: 100vw;
+      height: 80vh;
+      margin: 0 -8px;
+      background: #000;
+      overflow: hidden;
+    }
+
+    video, canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      opacity: 0.3;
+      transform: scaleX(-1);
+    }
+
+    canvas {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* オーバーレイUI */
+    .overlay-ui {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px;
+    }
+
+    .overlay-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .overlay-status {
+      font-size: 1.4rem;
+      font-weight: bold;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: rgba(127, 140, 141, 0.9);
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .status-standing { background: rgba(46, 204, 113, 0.9); color: #000; }
+    .status-moving { background: rgba(52, 152, 219, 0.9); }
+    .status-sitting { background: rgba(155, 89, 182, 0.9); }
+    .status-fall { background: rgba(231, 76, 60, 0.95); animation: pulse 0.5s infinite; }
+    .status-lying { background: rgba(230, 126, 34, 0.9); }
+    .status-unknown { background: rgba(127, 140, 141, 0.9); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .overlay-debug {
+      font-family: monospace;
+      font-size: 1.5rem;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 12px 16px;
+      border-radius: 10px;
+      line-height: 1.8;
+    }
+
+    .overlay-debug div {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+    }
+
+    .triggered-text {
+      color: #ff0000;
+      font-weight: bold;
+      text-shadow: 0 0 8px #ff0000;
+    }
+
+    .trigger-alert {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #fff;
+      background: rgba(231, 76, 60, 0.95);
+      padding: 20px 30px;
+      border-radius: 16px;
+      text-align: center;
+      line-height: 1.6;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      max-width: 90%;
+    }
+
+    .trigger-alert.show {
+      opacity: 1;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    button {
+      flex: 1;
+      min-width: 80px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: #3498db; color: #fff; }
+    .btn-danger { background: #e74c3c; color: #fff; }
+    .btn-toggle { background: #27ae60; color: #fff; }
+    .btn-toggle.off { background: #7f8c8d; }
+
+    .rules-panel {
+      margin: 8px auto;
+      padding: 12px;
+      background: #16213e;
+      border-radius: 8px;
+    }
+
+    .rule-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #333;
+      gap: 8px;
+    }
+
+    .rule-item:last-child {
+      border-bottom: none;
+    }
+
+    .rule-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .rule-label {
+      flex: 1;
+      font-size: 0.8rem;
+    }
+
+    .rule-desc {
+      font-size: 0.65rem;
+      color: #888;
+    }
+
+    .rule-status {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+    }
+
+    .rule-status.active {
+      background: #e74c3c;
+    }
+
+    .settings {
+      margin: 8px auto;
+      padding: 12px;
+      background: #16213e;
+      border-radius: 8px;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid #333;
+      font-size: 0.8rem;
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    input[type="range"] {
+      width: 90px;
+    }
+
+    .value-display {
+      min-width: 40px;
+      text-align: right;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+
+    .logic-select {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #333;
+    }
+
+    .logic-select label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚨 転倒検証システム</h1>
+
+  <div class="container">
+    <div class="controls">
+      <button id="startBtn" class="btn-primary">カメラ開始</button>
+      <button id="alertBtn" class="btn-toggle">🔊 ON</button>
+      <button id="resetBtn" class="btn-danger">リセット</button>
+    </div>
+
+    <div class="video-container">
+      <video id="video" playsinline></video>
+      <canvas id="canvas"></canvas>
+
+      <!-- オーバーレイUI -->
+      <div class="overlay-ui">
+        <div class="overlay-top">
+          <div id="statusMain" class="overlay-status status-unknown">待機中</div>
+          <div class="overlay-debug">
+            <div><span>1.体軸:</span><span id="dbgRule1">-</span></div>
+            <div><span>2.頭落:</span><span id="dbgRule2">-</span></div>
+            <div><span>3.床近:</span><span id="dbgRule3">-</span></div>
+            <div><span>4.比率:</span><span id="dbgRule4">-</span></div>
+            <div><span>5.重心:</span><span id="dbgRule5">-</span></div>
+            <div><span>6.静止:</span><span id="dbgRule6">-</span></div>
+          </div>
+        </div>
+        <!-- 中央に大きく表示 -->
+        <div id="triggerAlert" class="trigger-alert"></div>
+      </div>
+    </div>
+
+    <div class="rules-panel">
+      <h2>🎯 転倒検証ルール</h2>
+
+      <div class="rule-item">
+        <input type="checkbox" id="rule1" checked>
+        <div class="rule-label">
+          体軸水平化
+          <div class="rule-desc">肩-腰ベクトルが水平に近づく</div>
+        </div>
+        <div class="rule-status" id="rule1Status"></div>
+      </div>
+
+      <div class="rule-item">
+        <input type="checkbox" id="rule2" checked>
+        <div class="rule-label">
+          頭部急落
+          <div class="rule-desc">頭の高さが急激に下がる</div>
+        </div>
+        <div class="rule-status" id="rule2Status"></div>
+      </div>
+
+      <div class="rule-item">
+        <input type="checkbox" id="rule3" checked>
+        <div class="rule-label">
+          頭部が床面接近
+          <div class="rule-desc">頭が画面下部（床）に近い</div>
+        </div>
+        <div class="rule-status" id="rule3Status"></div>
+      </div>
+
+      <div class="rule-item">
+        <input type="checkbox" id="rule4" checked>
+        <div class="rule-label">
+          アスペクト比変化
+          <div class="rule-desc">縦長→横長に急変</div>
+        </div>
+        <div class="rule-status" id="rule4Status"></div>
+      </div>
+
+      <div class="rule-item">
+        <input type="checkbox" id="rule5" checked>
+        <div class="rule-label">
+          重心急落
+          <div class="rule-desc">体の重心が急激に下がる</div>
+        </div>
+        <div class="rule-status" id="rule5Status"></div>
+      </div>
+
+      <div class="rule-item">
+        <input type="checkbox" id="rule6">
+        <div class="rule-label">
+          転倒後静止
+          <div class="rule-desc">転倒後に動きが止まる</div>
+        </div>
+        <div class="rule-status" id="rule6Status"></div>
+      </div>
+
+      <div class="logic-select">
+        <label><input type="radio" name="logic" value="or"> OR</label>
+        <label><input type="radio" name="logic" value="and"> AND</label>
+        <label><input type="radio" name="logic" value="count" checked> 2つ以上</label>
+      </div>
+    </div>
+
+    <div class="settings">
+      <h2>⚙️ しきい値設定</h2>
+      <div class="setting-row">
+        <span>水平判定角度</span>
+        <input type="range" id="thresholdAngle" min="40" max="75" step="5" value="55">
+        <span class="value-display" id="thresholdAngleVal">55°</span>
+      </div>
+      <div class="setting-row">
+        <span>頭部急落しきい値</span>
+        <input type="range" id="thresholdHeadDrop" min="0.05" max="0.4" step="0.01" value="0.20">
+        <span class="value-display" id="thresholdHeadDropVal">0.20</span>
+      </div>
+      <div class="setting-row">
+        <span>床面接近しきい値</span>
+        <input type="range" id="thresholdFloor" min="0.2" max="0.9" step="0.05" value="0.55">
+        <span class="value-display" id="thresholdFloorVal">0.55</span>
+      </div>
+      <div class="setting-row">
+        <span>比率変化しきい値</span>
+        <input type="range" id="thresholdRatio" min="0.3" max="1.0" step="0.1" value="0.7">
+        <span class="value-display" id="thresholdRatioVal">0.7</span>
+      </div>
+      <div class="setting-row">
+        <span>重心急落しきい値</span>
+        <input type="range" id="thresholdCenterDrop" min="0.05" max="0.3" step="0.01" value="0.15">
+        <span class="value-display" id="thresholdCenterDropVal">0.15</span>
+      </div>
+      <div class="setting-row">
+        <span>臥床判定時間（秒）</span>
+        <input type="range" id="thresholdLying" min="5" max="60" step="5" value="10">
+        <span class="value-display" id="thresholdLyingVal">10</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="app.js"></script>
+</body>
+</html>
