@@ -277,9 +277,114 @@
       font-size: 0.8rem;
       cursor: pointer;
     }
+
+    /* 利用規約モーダル */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal-content {
+      background: #16213e;
+      border-radius: 16px;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      text-align: center;
+      margin-bottom: 16px;
+      color: #e74c3c;
+    }
+
+    .modal-text {
+      font-size: 0.85rem;
+      line-height: 1.8;
+      color: #ccc;
+      margin-bottom: 16px;
+    }
+
+    .modal-text strong {
+      color: #fff;
+    }
+
+    .modal-list {
+      margin: 12px 0;
+      padding-left: 20px;
+    }
+
+    .modal-list li {
+      margin-bottom: 8px;
+    }
+
+    .modal-developer {
+      font-size: 0.75rem;
+      color: #888;
+      text-align: center;
+      margin: 16px 0;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+    }
+
+    .modal-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: bold;
+      background: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .modal-btn:hover {
+      background: #2980b9;
+    }
   </style>
 </head>
 <body>
+  <!-- 利用規約モーダル -->
+  <div id="termsModal" class="modal-overlay">
+    <div class="modal-content">
+      <h2 class="modal-title">ご利用にあたって</h2>
+      <div class="modal-text">
+        <p><strong>本アプリは「転倒検証」ツールです。</strong></p>
+        <p>転倒検知システムの研究・検証を目的としており、実際の転倒検知・通報システムではありません。</p>
+
+        <ul class="modal-list">
+          <li>本アプリは<strong>研究・検証目的</strong>でのみご利用ください</li>
+          <li>転倒の検知精度を保証するものではありません</li>
+          <li>本アプリの使用により生じたいかなる損害についても、開発者は一切の責任を負いません</li>
+          <li>カメラ映像はすべて端末内で処理され、外部に送信されません</li>
+        </ul>
+
+        <p>「検証開始」ボタンを押すことで、上記の内容に同意したものとみなします。</p>
+      </div>
+      <div class="modal-developer">
+        開発: 特定非営利活動法人リハビリコラボレーション
+      </div>
+      <button class="modal-btn" onclick="document.getElementById('termsModal').classList.add('hidden')">検証開始</button>
+    </div>
+  </div>
+
   <h1>🚨 転倒検証システム</h1>
 
   <div class="container">
